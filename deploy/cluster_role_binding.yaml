@@ -1,0 +1,12 @@
+kind: ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: osd-adoption-metrics-exporter
+subjects:
+- kind: ServiceAccount
+  name: osd-adoption-metrics-exporter
+  namespace: osd-adoption-exporter-metrics
+roleRef:
+  kind: ClusterRole
+  name: osd-adoption-metrics-exporter
+  apiGroup: rbac.authorization.k8s.io
