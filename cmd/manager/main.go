@@ -8,6 +8,7 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+	"time"
 
 	"gitlab.cee.redhat.com/service/osd-adoption-metrics-exporter/pkg/apis"
 	"gitlab.cee.redhat.com/service/osd-adoption-metrics-exporter/pkg/controller"
@@ -37,7 +38,7 @@ import (
 var (
 	metricsHost               = "0.0.0.0"
 	metricsPort         int32 = 8383
-	operatorMetricsPort int   = 8686
+	operatorMetricsPort       = 8686
 )
 var log = logf.Log.WithName("cmd")
 
@@ -123,8 +124,8 @@ func main() {
 	}
 
 	// Setup metrics collector
-	collector := metrics.NewMetricsCollector()
-	metrics.Collector = collector
+	collector := metrics.NewMetricsAggregator(time.Minute)
+	metrics.Aggregator = collector
 	done := collector.Run()
 	defer close(done)
 
@@ -151,8 +152,13 @@ func main() {
 		os.Exit(1)
 	}
 	builder := customMetrics.NewBuilder()
-	metricsConfig := builder.WithServiceMonitor().WithPort(strconv.Itoa(operatorMetricsPort)).
-		WithCollector(metrics.Collector).WithPath("/metrics").WithServiceName("exporter").GetConfig()
+	metricsConfig := builder.WithServiceMonitor().
+		WithPort(strconv.Itoa(operatorMetricsPort)).
+		WithCollectors(metrics.Aggregator.GetMetrics()).
+		WithPath("/metrics").
+		WithServiceName("exporter").
+		GetConfig()
+
 	if err = customMetrics.ConfigureMetrics(context.TODO(), *metricsConfig); err != nil {
 		log.Error(err, "Failed to run metrics server")
 		os.Exit(1)

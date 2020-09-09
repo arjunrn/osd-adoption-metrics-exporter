@@ -97,7 +97,7 @@ func (r *ReconcileClusterRole) Reconcile(request reconcile.Request) (reconcile.R
 				return reconcile.Result{}, err
 			}
 		}
-		metrics.Collector.SetClusterAdmin(true)
+		metrics.Aggregator.SetClusterAdmin(true)
 	} else {
 		if utils.ContainsString(instance.ObjectMeta.Finalizers, finalizer) {
 			instance.ObjectMeta.Finalizers = utils.RemoveString(instance.ObjectMeta.Finalizers, finalizer)
@@ -105,8 +105,8 @@ func (r *ReconcileClusterRole) Reconcile(request reconcile.Request) (reconcile.R
 				return reconcile.Result{}, err
 			}
 		}
-		metrics.Collector.DeleteAuthIDP(instance.Name, instance.Namespace)
-		metrics.Collector.SetClusterAdmin(false)
+		metrics.Aggregator.DeleteAuthIDP(instance.Name, instance.Namespace)
+		metrics.Aggregator.SetClusterAdmin(false)
 	}
 
 	return reconcile.Result{}, nil

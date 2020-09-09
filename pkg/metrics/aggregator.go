@@ -16,15 +16,17 @@ type providerKey struct {
 	name      string
 	namespace string
 }
-type AdoptionMetricsCollector struct {
-	identityProviders *prometheus.GaugeVec
-	clusterAdmin      prometheus.Gauge
-	providerMap       map[providerKey][]v1.IdentityProviderType
-	mutex             sync.Mutex
+
+type AdoptionMetricsAggregator struct {
+	identityProviders   *prometheus.GaugeVec
+	clusterAdmin        prometheus.Gauge
+	providerMap         map[providerKey][]v1.IdentityProviderType
+	mutex               sync.Mutex
+	aggregationInterval time.Duration
 }
 
-func NewMetricsCollector() *AdoptionMetricsCollector {
-	collector := &AdoptionMetricsCollector{
+func NewMetricsAggregator(aggregationInterval time.Duration) *AdoptionMetricsAggregator {
+	collector := &AdoptionMetricsAggregator{
 		identityProviders: prometheus.NewGaugeVec(prometheus.GaugeOpts{
 			Name:        "identity_provider",
 			Help:        "Indicates if a identity provider is enabled",
@@ -34,14 +36,15 @@ func NewMetricsCollector() *AdoptionMetricsCollector {
 			Name: "cluster_admin_enabled",
 			Help: "Indicates if the cluster-admin role is enabled",
 		}),
-		providerMap: make(map[providerKey][]v1.IdentityProviderType),
+		providerMap:         make(map[providerKey][]v1.IdentityProviderType),
+		aggregationInterval: aggregationInterval,
 	}
 	collector.clusterAdmin.Set(0)
 	return collector
 }
 
-func (a *AdoptionMetricsCollector) Run() chan interface{} {
-	ticker := time.NewTicker(time.Minute)
+func (a *AdoptionMetricsAggregator) Run() chan interface{} {
+	ticker := time.NewTicker(a.aggregationInterval)
 	done := make(chan interface{})
 	go func() {
 		for {
@@ -49,23 +52,14 @@ func (a *AdoptionMetricsCollector) Run() chan interface{} {
 			case <-done:
 				return
 			case <-ticker.C:
-				a.aggregateMetrics()
+				a.aggregate()
 			}
 		}
 	}()
 	return done
 }
 
-func (a *AdoptionMetricsCollector) Describe(descs chan<- *prometheus.Desc) {
-	prometheus.DescribeByCollect(a, descs)
-}
-
-func (a *AdoptionMetricsCollector) Collect(metrics chan<- prometheus.Metric) {
-	a.clusterAdmin.Collect(metrics)
-	a.identityProviders.Collect(metrics)
-}
-
-func (a *AdoptionMetricsCollector) SetOAuthIDP(name, namespace string, provider []v1.IdentityProvider) {
+func (a *AdoptionMetricsAggregator) SetOAuthIDP(name, namespace string, provider []v1.IdentityProvider) {
 	providerTypes := make([]v1.IdentityProviderType, len(provider))
 	for i, p := range provider {
 		providerTypes[i] = p.Type
@@ -75,13 +69,13 @@ func (a *AdoptionMetricsCollector) SetOAuthIDP(name, namespace string, provider 
 	a.providerMap[providerKey{name: name, namespace: namespace}] = providerTypes
 }
 
-func (a *AdoptionMetricsCollector) DeleteAuthIDP(name, namespace string) {
+func (a *AdoptionMetricsAggregator) DeleteAuthIDP(name, namespace string) {
 	a.mutex.Lock()
 	defer a.mutex.Unlock()
 	delete(a.providerMap, providerKey{name: name, namespace: namespace})
 }
 
-func (a *AdoptionMetricsCollector) aggregateMetrics() {
+func (a *AdoptionMetricsAggregator) aggregate() {
 	a.mutex.Lock()
 	defer a.mutex.Unlock()
 	providers := make(map[v1.IdentityProviderType]int)
@@ -99,10 +93,22 @@ func (a *AdoptionMetricsCollector) aggregateMetrics() {
 	}
 }
 
-func (a *AdoptionMetricsCollector) SetClusterAdmin(enabled bool) {
+func (a *AdoptionMetricsAggregator) SetClusterAdmin(enabled bool) {
 	if enabled {
 		a.clusterAdmin.Set(1)
 	} else {
 		a.clusterAdmin.Set(0)
 	}
+}
+
+func (a *AdoptionMetricsAggregator) GetMetrics() []prometheus.Collector {
+	return []prometheus.Collector{a.identityProviders, a.clusterAdmin}
+}
+
+func (a *AdoptionMetricsAggregator) GetClusterRoleMetric() prometheus.Gauge {
+	return a.clusterAdmin
+}
+
+func (a *AdoptionMetricsAggregator) GetIdentityProviderMetric() *prometheus.GaugeVec {
+	return a.identityProviders
 }

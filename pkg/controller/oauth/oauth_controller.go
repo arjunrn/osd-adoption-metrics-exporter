@@ -98,7 +98,7 @@ func (r *ReconcileOAuth) Reconcile(request reconcile.Request) (reconcile.Result,
 				return reconcile.Result{}, err
 			}
 		}
-		metrics.Collector.SetOAuthIDP(instance.Name, instance.Namespace, instance.Spec.IdentityProviders)
+		metrics.Aggregator.SetOAuthIDP(instance.Name, instance.Namespace, instance.Spec.IdentityProviders)
 	} else {
 		if utils.ContainsString(instance.ObjectMeta.Finalizers, finalizer) {
 			instance.ObjectMeta.Finalizers = utils.RemoveString(instance.ObjectMeta.Finalizers, finalizer)
@@ -106,7 +106,7 @@ func (r *ReconcileOAuth) Reconcile(request reconcile.Request) (reconcile.Result,
 				return reconcile.Result{}, err
 			}
 		}
-		metrics.Collector.DeleteAuthIDP(instance.Name, instance.Namespace)
+		metrics.Aggregator.DeleteAuthIDP(instance.Name, instance.Namespace)
 	}
 
 	return reconcile.Result{}, nil

@@ -1,5 +1,5 @@
 package metrics
 
 var (
-	Collector *AdoptionMetricsCollector
+	Aggregator *AdoptionMetricsAggregator
 )
